@@ -39,18 +39,25 @@ async function init() {
   console.log("Initializing VibeScan AI...");
 
   // Load Models
+  const modelPath = './models/';
   try {
-    console.log("Loading AI models from ./models/");
+    console.log("Loading AI models from", modelPath);
     await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-      faceapi.nets.faceExpressionNet.loadFromUri('./models'),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri('./models')
+      faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+      faceapi.nets.faceExpressionNet.loadFromUri(modelPath),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath)
     ]);
     state.modelsLoaded = true;
-    console.log("✅ AI Models loaded successfully");
+    console.log("✅ Models Loaded Successfully");
   } catch (e) {
     console.error("❌ Error loading models:", e);
-    alert("Failed to load AI models. Please check that ./models/ directory exists and contains the required face-api.js model files.");
+    console.error("Model path attempted:", modelPath);
+    console.error("Check that ./models/ directory exists in public folder");
+    alert(
+      "Failed to load AI models. Tried path: " +
+        modelPath +
+        "\n\nEnsure models folder exists in public/models/"
+    );
   }
 
   // Check Premium Status

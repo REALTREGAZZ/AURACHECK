@@ -2,6 +2,9 @@
   "appId": "com.auracheck.app",
   "appName": "AuraCheck",
   "webDir": "dist",
+  "server": {
+    "cleartext": true
+  },
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
