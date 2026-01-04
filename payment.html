@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VibeScan AI - Donate</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0D0D0D;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .payment-container {
+      max-width: 500px;
+      background: rgba(20, 20, 20, 0.8);
+      border: 1px solid #8A2BE2;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 0 30px rgba(138, 43, 226, 0.3);
+    }
+
+    h1 {
+      color: #8A2BE2;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    p {
+      text-align: center;
+      color: #aaa;
+      margin-bottom: 30px;
+    }
+
+    .payment-methods {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .payment-btn {
+      background: linear-gradient(135deg, #8A2BE2, #00FF7F);
+      border: none;
+      padding: 15px;
+      border-radius: 8px;
+      color: #000;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .payment-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(138, 43, 226, 0.5);
+    }
+
+    .payment-btn.crypto {
+      background: linear-gradient(135deg, #00f3ff, #8A2BE2);
+    }
+
+    .divider {
+      text-align: center;
+      margin: 20px 0;
+      color: #666;
+      position: relative;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #333;
+    }
+
+    .divider::before {
+      left: 0;
+    }
+
+    .divider::after {
+      right: 0;
+    }
+
+    .info-box {
+      background: rgba(0, 255, 65, 0.1);
+      border: 1px solid #00ff41;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .back-btn {
+      margin-top: 20px;
+      background: transparent;
+      border: 1px solid #666;
+      color: #aaa;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.2s;
+    }
+
+    .back-btn:hover {
+      border-color: #8A2BE2;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="payment-container">
+    <div class="premium-header">
+      <div class="premium-icon">💎</div>
+      <h1>VibeScan Premium</h1>
+      <p class="subtitle">Unlock the full potential of your vibe</p>
+    </div>
+
+    <div class="features-list">
+      <div class="feature-item">
+        <span class="check">✓</span>
+        <span><strong>Glow Up Mode</strong> (Beauty Score & Tips)</span>
+      </div>
+      <div class="feature-item">
+        <span class="check">✓</span>
+        <span><strong>Unlimited Scans</strong> (No cooldowns)</span>
+      </div>
+      <div class="feature-item">
+        <span class="check">✓</span>
+        <span><strong>Exclusive Badges</strong> (Sigma, Rizz God)</span>
+      </div>
+      <div class="feature-item">
+        <span class="check">✓</span>
+        <span><strong>No Ads</strong> (Forever)</span>
+      </div>
+    </div>
+
+    <div class="price-tag">
+      <span class="currency">$</span>9.99 <span class="period">/ lifetime</span>
+    </div>
+
+    <button class="payment-btn google-play" onclick="processPurchase()">
+      <svg viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor"
+          d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z" />
+      </svg>
+      Buy with Google Pay
+    </button>
+
+    <p class="secure-text">
+      <svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align: middle">
+        <path fill="#00FF7F" d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z" />
+      </svg>
+      Secured by Google Play
+    </p>
+
+    <button class="back-btn" onclick="window.location.href='/'">
+      Cancel
+    </button>
+  </div>
+
+  <script type="module">
+    import { PaymentOrchestrator } from './payment-orchestrator.js';
+
+    // Initialize orchestrator (even if simulated)
+    const orchestrator = new PaymentOrchestrator({
+      cryptoWallet: '0xa57ea41a2d2237d1884bbeb96f7fd249d73f249e'
+    });
+
+    window.processPurchase = function () {
+      // Simulate Google Play Purchase Flow
+      const btn = document.querySelector('.payment-btn');
+      const originalText = btn.innerHTML;
+
+      btn.innerHTML = '<div class="spinner"></div> Processing...';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        // 1. Record Transaction (Simulated)
+        orchestrator.processPayment({
+          userId: 'user-' + Date.now(),
+          amount: 9.99
+        }).then(tx => {
+          console.log('Transaction recorded:', tx);
+
+          // 2. Unlock Premium
+          localStorage.setItem('vibescan_premium', 'true');
+
+          // 3. Success Feedback
+          btn.style.background = '#00FF7F';
+          btn.style.color = '#000';
+          btn.innerHTML = '✓ PURCHASE SUCCESSFUL';
+
+          alert("🎉 Premium Unlocked!\n\nThank you for your purchase. All features are now available.");
+
+          // 4. Redirect
+          setTimeout(() => window.location.href = '/', 1500);
+        });
+      }, 2000); // Fake network delay
+    };
+  </script>
+
+  <style>
+    /* Updated Styles for Premium Page */
+    .premium-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .premium-icon {
+      font-size: 60px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 0 20px rgba(138, 43, 226, 0.5));
+    }
+
+    .subtitle {
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .features-list {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 15px;
+    }
+
+    .feature-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .check {
+      color: #00FF7F;
+      font-weight: bold;
+    }
+
+    .price-tag {
+      text-align: center;
+      font-size: 48px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 30px;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+
+    .currency {
+      font-size: 24px;
+      vertical-align: super;
+      color: #8A2BE2;
+    }
+
+    .period {
+      font-size: 14px;
+      color: #666;
+      font-weight: normal;
+      vertical-align: middle;
+    }
+
+    .google-play {
+      background: #fff;
+      color: #000;
+      width: 100%;
+      justify-content: center;
+      font-family: 'Roboto', sans-serif;
+      border: 1px solid #ddd;
+    }
+
+    .google-play:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+    }
+
+    .secure-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 0, 0, 0.3);
+      border-radius: 50%;
+      border-top-color: #000;
+      animation: spin 1s ease-in-out infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</body>
+
+</html>
