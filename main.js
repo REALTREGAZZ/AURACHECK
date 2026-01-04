@@ -40,16 +40,17 @@ async function init() {
 
   // Load Models
   try {
+    console.log("Loading AI models from ./models/");
     await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-      faceapi.nets.faceExpressionNet.loadFromUri('/models'),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri('/models')
+      faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
+      faceapi.nets.faceExpressionNet.loadFromUri('./models'),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri('./models')
     ]);
     state.modelsLoaded = true;
-    console.log("Models Loaded");
+    console.log("✅ AI Models loaded successfully");
   } catch (e) {
-    console.error("Error loading models:", e);
-    alert("Failed to load AI models. Ensure /models directory exists.");
+    console.error("❌ Error loading models:", e);
+    alert("Failed to load AI models. Please check that ./models/ directory exists and contains the required face-api.js model files.");
   }
 
   // Check Premium Status
