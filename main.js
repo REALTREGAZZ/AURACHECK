@@ -92,7 +92,7 @@ class PremiumManager {
     this.isPremium = localStorage.getItem('vibescan_premium') === 'true';
     this.productId = 'premium_lifetime'; // ID en Google Play Console
     this.price = '$9.99 USD';
-    this.InAppPurchase = null;
+    this.IAP = null; // Será asignado desde Capacitor.Plugins en init()
     this.isNative = Capacitor.isNativePlatform();
   }
 
@@ -108,62 +108,70 @@ class PremiumManager {
       return;
     }
     
-    // ✅ Si ES nativo, cargar el plugin con dynamic import
+    // ✅ Si ES nativo, obtener plugin desde Capacitor.Plugins
     try {
       console.log("📱 Plataforma nativa detectada - Inicializando Google Play Billing");
       
-      // DYNAMIC IMPORT - Seguro para Vite
-      const iapModule = await import('@capacitor-community/in-app-purchase');
-      this.InAppPurchase = iapModule.InAppPurchase;
+      // OBTENER PLUGIN DESDE CAPACITOR (SIN IMPORTS)
+      this.IAP = Capacitor.Plugins?.InAppPurchase;
       
-      if (!this.InAppPurchase) {
-        throw new Error('InAppPurchase export no encontrado');
+      if (!this.IAP) {
+        throw new Error('InAppPurchase no disponible en Capacitor.Plugins');
       }
       
-      // Inicializar plugin
+      console.log("✅ Plugin InAppPurchase disponible en Capacitor.Plugins");
+      
+      // Inicializar plugin (si es necesario)
       try {
-        await this.InAppPurchase.initialize({
-          ios: true,
-          android: true
-        });
-      } catch {
-        await this.InAppPurchase.initialize();
+        if (typeof this.IAP.initialize === 'function') {
+          await this.IAP.initialize({ ios: true, android: true });
+          console.log("✅ Google Play Billing inicializado correctamente");
+        }
+      } catch (e) {
+        console.log("ℹ️ Initialize no requerido o falló:", e.message);
       }
-      
-      console.log("✅ Google Play Billing inicializado correctamente");
       
       // Escuchar compras
-      if (typeof this.InAppPurchase.onPurchasesUpdated === 'function') {
-        this.InAppPurchase.onPurchasesUpdated(async (result) => {
+      if (typeof this.IAP.onPurchasesUpdated === 'function') {
+        this.IAP.onPurchasesUpdated(async (result) => {
           console.log("🔔 Compras actualizadas:", result);
           await this.handlePurchaseUpdate(result);
         });
-      } else if (typeof this.InAppPurchase.addListener === 'function') {
-        this.InAppPurchase.addListener('purchasesUpdated', async (result) => {
+        console.log("✅ Listener de compras registrado");
+      } else if (typeof this.IAP.addListener === 'function') {
+        this.IAP.addListener('purchasesUpdated', async (result) => {
           console.log("🔔 Compras actualizadas:", result);
           await this.handlePurchaseUpdate(result);
         });
+        console.log("✅ Listener de compras registrado");
+      } else {
+        console.log("ℹ️ No se encontró método para escuchar compras");
       }
       
+      // Restaurar compras existentes
       await this.restorePurchases();
       
     } catch (e) {
       console.warn("⚠️ Error inicializando Google Play Billing:", e.message);
       console.log("ℹ️ Premium funcionará en modo simulado");
-      this.InAppPurchase = null;
+      this.IAP = null;
     }
   }
 
   async restorePurchases() {
-    if (!this.InAppPurchase) return;
+    if (!this.IAP) return;
 
     try {
-      if (typeof this.InAppPurchase.getPurchases === 'function') {
-        const purchases = await this.InAppPurchase.getPurchases();
+      if (typeof this.IAP.getPurchases === 'function') {
+        const purchases = await this.IAP.getPurchases();
         await this.handlePurchaseUpdate(purchases);
-      } else if (typeof this.InAppPurchase.restorePurchases === 'function') {
-        const purchases = await this.InAppPurchase.restorePurchases();
+        console.log("✅ Compras restauradas exitosamente");
+      } else if (typeof this.IAP.restorePurchases === 'function') {
+        const purchases = await this.IAP.restorePurchases();
         await this.handlePurchaseUpdate(purchases);
+        console.log("✅ Compras restauradas exitosamente");
+      } else {
+        console.log("ℹ️ No se encontró método para restaurar compras");
       }
     } catch (e) {
       console.log("ℹ️ No se pudieron restaurar compras:", e.message);
@@ -188,12 +196,16 @@ class PremiumManager {
         await this.activatePremium({ showAlert: false });
 
         try {
-          if (typeof this.InAppPurchase.finishTransaction === 'function') {
-            await this.InAppPurchase.finishTransaction({ purchase });
-          } else if (typeof this.InAppPurchase.acknowledgePurchase === 'function') {
-            await this.InAppPurchase.acknowledgePurchase({ purchase });
+          // ✅ Reconocer compra en Google Play
+          if (typeof this.IAP?.finishTransaction === 'function') {
+            await this.IAP.finishTransaction({ purchase });
+            console.log("✅ Transacción finalizada");
+          } else if (typeof this.IAP?.acknowledgePurchase === 'function') {
+            await this.IAP.acknowledgePurchase({ purchase });
+            console.log("✅ Compra reconocida");
           }
-        } catch {
+        } catch (e) {
+          console.log("ℹ️ No se pudo reconocer compra:", e.message);
           // No bloquear activación Premium por falta de acknowledge
         }
       }
@@ -211,61 +223,41 @@ class PremiumManager {
       return;
     }
 
-    if (!this.InAppPurchase) {
-      console.log("ℹ️ Simulando compra en navegador/web");
-      const simulatePayment = confirm(
-        "💎 PREMIUM - $9.99 USD\n\n" +
-          "Desbloquea:\n" +
-          "• Escaneos ilimitados\n" +
-          "• Todos los badges\n" +
-          "• Modo Glow Up (Beauty Score)\n" +
-          "• Historial completo\n\n" +
-          "¿Confirmar compra?"
-      );
-
-      if (simulatePayment) {
-        await this.activatePremium({ showAlert: true });
-      }
+    // ✅ Obtener plugin desde Capacitor.Plugins (SIN IMPORTS)
+    const IAP = Capacitor.Plugins?.InAppPurchase;
+    
+    if (!IAP) {
+      console.log("ℹ️ Simulando compra (Google Play Billing no disponible)");
+      this.simulatePremiumPurchase();
       return;
     }
 
     try {
       console.log(`💳 Solicitando producto: ${this.productId}`);
 
-      // Obtener detalles del producto
-      let productsResponse = null;
-      try {
-        productsResponse = await this.InAppPurchase.getProducts({
-          ios: [],
-          android: [this.productId]
-        });
-      } catch {
-        try {
-          productsResponse = await this.InAppPurchase.getProducts({ products: [this.productId] });
-        } catch {
-          productsResponse = await this.InAppPurchase.getProducts([this.productId]);
-        }
-      }
-
-      const products = Array.isArray(productsResponse)
-        ? productsResponse
-        : (productsResponse?.products || productsResponse?.android || []);
-
-      console.log("📦 Productos disponibles:", productsResponse);
-
+      // Obtener detalles del producto desde Google Play
+      const result = await IAP.getProducts({
+        ios: [],
+        android: [this.productId]
+      });
+      
+      console.log("📦 Resultado de getProducts:", result);
+      
+      const products = result?.products || [];
       if (!products || products.length === 0) {
         console.error("❌ Producto no encontrado en Google Play Console");
         alert(
           "❌ Error en Compra\n\n" +
             "El producto Premium no está configurado en Google Play Console.\n\n" +
-            "ID esperado: " + this.productId
+            "ID esperado: " + this.productId + "\n\n" +
+            "Ve a: Google Play Console > Monetizar > Productos integrados"
         );
         return;
       }
-
+      
       const product = products[0];
-      console.log(`💰 Precio: ${product.localizedPrice || product.price || this.price}`);
-
+      console.log(`💰 Precio: ${product.localizedPrice}`);
+      
       // Mostrar confirmación con precio real
       const confirmed = confirm(
         `💎 PREMIUM UNLOCK\n\n` +
@@ -277,37 +269,50 @@ class PremiumManager {
           `• Historial completo\n\n` +
           `¿Proceder al pago?`
       );
-
+      
       if (!confirmed) {
         console.log("❌ Usuario canceló compra");
         return;
       }
-
+      
       // Procesar compra
-      console.log("⏳ Procesando compra...");
-
-      if (typeof this.InAppPurchase.purchaseProduct === 'function') {
-        await this.InAppPurchase.purchaseProduct({
-          productId: this.productId
-        });
-      } else if (typeof this.InAppPurchase.purchase === 'function') {
-        await this.InAppPurchase.purchase({
-          productId: this.productId
-        });
+      console.log("⏳ Procesando compra en Google Play...");
+      const purchaseResult = await IAP.purchaseProduct({
+        productId: this.productId
+      });
+      
+      console.log("📋 Resultado de compra:", purchaseResult);
+      
+      if (purchaseResult?.success) {
+        console.log("✅ Compra exitosa desde Google Play");
+        await this.activatePremium();
       } else {
-        await this.InAppPurchase.purchase({
-          products: [{ productId: this.productId }]
-        });
+        console.log("⏳ Compra pendiente de confirmación de Google Play");
       }
-
-      console.log("⏳ Esperando confirmación de Google Play...");
+      
     } catch (e) {
       console.error("❌ Error en proceso de compra:", e);
       alert(
         "❌ Error en la Compra\n\n" +
-          e.message + "\n\n" +
+          (e.message || "Error desconocido") + "\n\n" +
           "Por favor, intenta de nuevo más tarde."
       );
+    }
+  }
+
+  simulatePremiumPurchase() {
+    const simulatePayment = confirm(
+      "💎 PREMIUM - $9.99 USD\n\n" +
+        "Desbloquea:\n" +
+        "• Escaneos ilimitados\n" +
+        "• Todos los badges\n" +
+        "• Modo Glow Up (Beauty Score)\n" +
+        "• Historial completo\n\n" +
+        "¿Confirmar compra? (simulada en web)"
+    );
+    
+    if (simulatePayment) {
+      this.activatePremium();
     }
   }
 
