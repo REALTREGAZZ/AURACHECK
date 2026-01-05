@@ -1,4 +1,5 @@
 import * as faceapi from 'face-api.js';
+import { Capacitor } from '@capacitor/core';
 import './style.css';
 
 // === SOLICITUD DE PERMISO DE CÁMARA ===
@@ -14,61 +15,7 @@ async function requestCameraPermission() {
   }
 
   try {
-    let Permissions = null;
-
-    try {
-      const permissionsPkg = '@capacitor/permissions';
-      const permissionsModule = await import(/* @vite-ignore */ permissionsPkg);
-      Permissions = permissionsModule.Permissions;
-    } catch {
-      Permissions = null;
-    }
-
-    if (Permissions?.query && Permissions?.requestPermissions) {
-      // Solicitar permiso de cámara
-      const cameraPermission = await Permissions.query({
-        name: 'Camera'
-      });
-
-      console.log(`📹 Estado actual del permiso de cámara: ${cameraPermission.state}`);
-
-      if (cameraPermission.state === 'prompt') {
-        console.log("⏳ Pidiendo permiso al usuario...");
-
-        const requestResult = await Permissions.requestPermissions({
-          permissions: ['Camera']
-        });
-
-        console.log("🔍 Resultado de solicitud:", requestResult);
-
-        const cameraState = requestResult.state;
-
-        if (cameraState === 'granted') {
-          console.log("✅ PERMISO DE CÁMARA CONCEDIDO");
-          return true;
-        } else {
-          console.warn("❌ PERMISO DE CÁMARA DENEGADO");
-          alert(
-            "⚠️ Permiso de Cámara Requerido\n\n" +
-              "AuraCheck necesita acceso a tu cámara para escanear tu vibe.\n\n" +
-              "Por favor, autoriza el acceso a la cámara en la configuración de Android."
-          );
-          return false;
-        }
-      } else if (cameraPermission.state === 'granted') {
-        console.log("✅ PERMISO DE CÁMARA YA CONCEDIDO");
-        return true;
-      } else {
-        console.warn("❌ PERMISO DE CÁMARA DENEGADO PERMANENTEMENTE");
-        alert(
-          "⚠️ Permiso de Cámara Denegado\n\n" +
-            "Necesitas autorizar el acceso a la cámara en:\n" +
-            "Configuración > Aplicaciones > AuraCheck > Permisos > Cámara"
-        );
-        return false;
-      }
-    }
-
+    // ✅ Usar método estándar de Capacitor para permisos
     let Camera = null;
     try {
       const cameraModule = await import('@capacitor/camera');
@@ -139,34 +86,41 @@ async function requestCameraPermission() {
   }
 }
 
-// === SISTEMA PREMIUM CON GOOGLE PLAY ===
+// === SISTEMA PREMIUM CON GOOGLE PLAY (SEGURO PARA VITE) ===
 class PremiumManager {
   constructor() {
     this.isPremium = localStorage.getItem('vibescan_premium') === 'true';
     this.productId = 'premium_lifetime'; // ID en Google Play Console
     this.price = '$9.99 USD';
     this.InAppPurchase = null;
+    this.isNative = Capacitor.isNativePlatform();
   }
 
   async init() {
     console.log("\n═══════════════════════════════════════════════════════");
     console.log("💎 INICIALIZANDO SISTEMA PREMIUM");
     console.log("═══════════════════════════════════════════════════════");
-
-    if (window.Capacitor === undefined) {
-      console.log("🌐 No es Capacitor, Premium simulado en web");
+    
+    // ✅ Si NO es nativo, salir limpiamente
+    if (!this.isNative) {
+      console.log("🌐 Plataforma web detectada - Premium simulado");
+      console.log("💡 Google Play Billing solo disponible en Android");
       return;
     }
-
+    
+    // ✅ Si ES nativo, cargar el plugin con dynamic import
     try {
+      console.log("📱 Plataforma nativa detectada - Inicializando Google Play Billing");
+      
+      // DYNAMIC IMPORT - Seguro para Vite
       const iapModule = await import('@capacitor-community/in-app-purchase');
       this.InAppPurchase = iapModule.InAppPurchase;
-
+      
       if (!this.InAppPurchase) {
         throw new Error('InAppPurchase export no encontrado');
       }
-
-      // Inicializar Google Play Billing
+      
+      // Inicializar plugin
       try {
         await this.InAppPurchase.initialize({
           ios: true,
@@ -175,10 +129,10 @@ class PremiumManager {
       } catch {
         await this.InAppPurchase.initialize();
       }
-
-      console.log("✅ Google Play Billing inicializado");
-
-      // Escuchar cambios en compras
+      
+      console.log("✅ Google Play Billing inicializado correctamente");
+      
+      // Escuchar compras
       if (typeof this.InAppPurchase.onPurchasesUpdated === 'function') {
         this.InAppPurchase.onPurchasesUpdated(async (result) => {
           console.log("🔔 Compras actualizadas:", result);
@@ -190,11 +144,12 @@ class PremiumManager {
           await this.handlePurchaseUpdate(result);
         });
       }
-
+      
       await this.restorePurchases();
+      
     } catch (e) {
-      console.warn("⚠️ Google Play Billing no disponible:", e.message);
-      console.log("Usando sistema Premium simulado");
+      console.warn("⚠️ Error inicializando Google Play Billing:", e.message);
+      console.log("ℹ️ Premium funcionará en modo simulado");
       this.InAppPurchase = null;
     }
   }
