@@ -258,10 +258,10 @@ class PremiumManager {
       const product = products[0];
       console.log(`💰 Precio: ${product.localizedPrice}`);
       
-      // Mostrar confirmación con precio real
+      // Mostrar confirmación (precio fijo en USD)
       const confirmed = confirm(
         `💎 PREMIUM UNLOCK\n\n` +
-          `Precio: ${product.localizedPrice || this.price}\n\n` +
+          `Precio: ${this.price}\n\n` +
           `Desbloquea:\n` +
           `• Escaneos ilimitados\n` +
           `• Todos los badges\n` +
@@ -415,64 +415,87 @@ const hudText = document.getElementById('hud-text');
 const finalCard = document.getElementById('final-card');
 const modeBtns = document.querySelectorAll('.mode-btn');
 
-// === Diagnóstico de Rutas de Modelos ===
+// === DIAGNÓSTICO Y CARGA DE MODELOS (v5) ===
 async function testModelAccess() {
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("🔍 DIAGNÓSTICO DE MODELOS V5");
   console.log("═══════════════════════════════════════════════════════");
-  console.log("🔍 INICIANDO DIAGNÓSTICO DE MODELOS");
-  console.log("═══════════════════════════════════════════════════════");
-
+  
   console.log(`Protocol: ${window.location.protocol}`);
-  console.log(`Href: ${window.location.href}`);
-  console.log(`Capacitor detected: ${window.Capacitor !== undefined}`);
   console.log(`Origin: ${window.location.origin}`);
+  console.log(`Capacitor: ${window.Capacitor !== undefined}`);
+  
+  return { success: true };
+}
 
-  const testFiles = [
-    'models/tiny_face_detector_model-shard1.bin',
-    'models/face_expression_model-shard1.bin',
-    'models/face_landmark_68_tiny_model-shard1.bin'
-  ];
-
-  // Rutas a intentar
-  const pathPrefixes = [
-    'models',
-    './models',
-    'file://android_asset/public/models',
-    '/models',
-    'assets/models'
-  ];
-
-  console.log("═══════════════════════════════════════════════════════");
-  console.log("📂 PROBANDO RUTAS DE ACCESO");
+async function loadAIModels() {
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("🤖 CARGANDO MODELOS DE IA (V5)");
   console.log("═══════════════════════════════════════════════════════");
 
-  for (const prefix of pathPrefixes) {
-    console.log(`\n📍 Intentando con prefijo: "${prefix}"`);
+  const isCapacitor = window.Capacitor !== undefined;
+  const isAndroid = isCapacitor && (
+    (typeof Capacitor?.getPlatform === 'function' && Capacitor.getPlatform() === 'android') ||
+    window.Capacitor?.platform?.name === 'android'
+  );
+  
+  console.log(`Capacitor: ${isCapacitor}`);
+  console.log(`Android: ${isAndroid}`);
 
-    for (const file of testFiles.slice(0, 1)) { // Probar solo el primero para no saturar logs
-      const fullPath = `${prefix}/${file.split('/')[1]}`;
+  // Rutas a intentar (orden de preferencia)
+  const modelPaths = [
+    // 1. Ruta absoluta con origin (web + Android)
+    `${window.location.origin}/models/`,
+    // 2. Ruta relativa (web dev)
+    './models/',
+    // 3. Android asset (último recurso)
+    'file:///android_asset/public/models/'
+  ];
 
-      try {
-        console.log(`  → Fetch: ${fullPath}`);
-        const response = await fetch(fullPath, { method: 'HEAD' });
-
-        if (response.ok) {
-          console.log(`  ✅ ACCESIBLE: ${fullPath} (${response.status})`);
-          return { success: true, workingPath: prefix, status: response.status };
-        }
-
-        console.log(`  ❌ No accesible: ${fullPath} (HTTP ${response.status})`);
-      } catch (e) {
-        console.log(`  ❌ Error: ${fullPath}`);
-        console.log(`     Motivo: ${e.message}`);
-      }
+  for (const modelPath of modelPaths) {
+    try {
+      console.log(`\n📂 Intentando: ${modelPath}`);
+      
+      const startTime = performance.now();
+      
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+        faceapi.nets.faceExpressionNet.loadFromUri(modelPath),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath)
+      ]);
+      
+      const endTime = performance.now();
+      state.modelsLoaded = true;
+      
+      console.log(`✅ MODELOS CARGADOS EN ${(endTime - startTime).toFixed(2)}ms`);
+      console.log(`   Ruta exitosa: ${modelPath}`);
+      console.log("   - TinyFaceDetector ✓");
+      console.log("   - FaceExpressionNet ✓");
+      console.log("   - FaceLandmark68TinyNet ✓");
+      
+      return { success: true, path: modelPath };
+      
+    } catch (e) {
+      console.warn(`⚠️ Falló: ${modelPath}`);
+      console.warn(`   Error: ${e.message}`);
+      continue;
     }
   }
-
-  console.log("\n═══════════════════════════════════════════════════════");
-  console.log("❌ NINGUNA RUTA FUNCIONÓ");
-  console.log("═══════════════════════════════════════════════════════");
-
-  return { success: false, workingPath: null };
+  
+  console.error("\n❌ FALLO CRÍTICO: No se cargaron los modelos");
+  console.error("Rutas intentadas:");
+  modelPaths.forEach((p, i) => console.error(`  ${i + 1}. ${p}`));
+  
+  alert(
+    "❌ FALLO DE MODELOS\n\n" +
+    "No se pudieron cargar los modelos de IA.\n\n" +
+    "Soluciones:\n" +
+    "1. Verifica que public/models/ contiene archivos .bin y .json\n" +
+    "2. Ejecuta: npm run build\n" +
+    "3. Ejecuta: npx cap sync android"
+  );
+  
+  return { success: false, path: null };
 }
 
 // --- Initialization ---
@@ -498,83 +521,11 @@ async function init() {
   }
 
   // 4. CARGAR MODELOS DE IA
-  const isCapacitor = window.Capacitor !== undefined;
-  const isProduction = !window.location.href.includes('localhost');
-  const isFileProtocol = window.location.protocol === 'file:';
+  const modelResult = await loadAIModels();
 
-  console.log(`\n🔧 ENTORNO DETECTADO:`);
-  console.log(`   Capacitor: ${isCapacitor}`);
-  console.log(`   Producción: ${isProduction}`);
-  console.log(`   Protocol file://: ${isFileProtocol}`);
-
-  let modelPath = './models/';
-
-  if (isCapacitor || isFileProtocol) {
-    modelPath = 'models/';
-    console.log(`📱 Usando ruta Capacitor: ${modelPath}`);
-  } else {
-    modelPath = './models/';
-    console.log(`🌐 Usando ruta web: ${modelPath}`);
-  }
-
-  try {
-    console.log(`\n⏳ Cargando modelos desde: ${modelPath}`);
-
-    const startTime = performance.now();
-
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-      faceapi.nets.faceExpressionNet.loadFromUri(modelPath),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath)
-    ]);
-
-    const endTime = performance.now();
-    state.modelsLoaded = true;
-
-    console.log(`✅ MODELOS CARGADOS EXITOSAMENTE en ${(endTime - startTime).toFixed(2)}ms`);
-    console.log("   - TinyFaceDetector ✓");
-    console.log("   - FaceExpressionNet ✓");
-    console.log("   - FaceLandmark68TinyNet ✓");
-  } catch (e) {
-    console.error(`❌ ERROR CARGANDO MODELOS:`, e);
-    const fallbackPaths = ['models/', './models/', '/models/', 'assets/models/'];
-
-    let loadedFromFallback = false;
-
-    for (const fallback of fallbackPaths) {
-      if (fallback === modelPath) continue;
-
-      try {
-        console.log(`   → Probando fallback: ${fallback}`);
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(fallback),
-          faceapi.nets.faceExpressionNet.loadFromUri(fallback),
-          faceapi.nets.faceLandmark68TinyNet.loadFromUri(fallback)
-        ]);
-        state.modelsLoaded = true;
-        loadedFromFallback = true;
-        console.log(`✅ MODELOS CARGADOS desde fallback: ${fallback}`);
-        break;
-      } catch {
-        console.log(`   ❌ Fallback ${fallback} falló`);
-      }
-    }
-
-    if (!loadedFromFallback) {
-      console.error("\n💥 FALLO CRÍTICO: No se pudieron cargar los modelos desde ninguna ruta");
-      alert(
-        "❌ FALLO DE MODELOS\n\n" +
-          "Diagnóstico:\n" +
-          `• Ruta intentada: ${modelPath}\n` +
-          `• Protocol: ${window.location.protocol}\n` +
-          `• Capacitor: ${isCapacitor}\n\n` +
-          "Soluciones:\n" +
-          "1. Verifica que public/models/ contiene los archivos\n" +
-          "2. Ejecuta: npm run build\n" +
-          "3. Revisa la consola para ver qué rutas fallaron"
-      );
-      return;
-    }
+  if (!modelResult.success) {
+    console.error("❌ Modelos no disponibles, app puede fallar");
+    // Continuar de todas formas (algunos tests pueden no usar modelos)
   }
 
   // 5. SETUP PREMIUM - Verificar estado al iniciar

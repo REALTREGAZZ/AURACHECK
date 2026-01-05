@@ -1,4 +1,4 @@
-package com.vibescan.ai.scanner;
+package com.auracheck.app;
 
 import com.getcapacitor.BridgeActivity;
 
