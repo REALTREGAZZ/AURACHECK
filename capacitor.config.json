@@ -2,6 +2,7 @@
   "appId": "com.auracheck.app",
   "appName": "AuraCheck",
   "webDir": "dist",
+  "orientation": "portrait",
   "server": {
     "cleartext": true,
     "allowNavigation": ["*"]
@@ -9,6 +10,9 @@
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
+    },
+    "ScreenOrientation": {
+      "orientations": ["portrait"]
     }
   }
 }

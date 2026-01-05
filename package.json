@@ -16,6 +16,7 @@
     "@capacitor/android": "^8.0.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^8.0.0",
+    "@capacitor/screen-orientation": "^8.0.0",
     "face-api.js": "^0.22.2"
   }
 }

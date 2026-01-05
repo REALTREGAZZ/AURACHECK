@@ -34,18 +34,112 @@ const hudText = document.getElementById('hud-text');
 const finalCard = document.getElementById('final-card');
 const modeBtns = document.querySelectorAll('.mode-btn');
 
+// === Diagnóstico de Rutas de Modelos ===
+async function testModelAccess() {
+  console.log("═══════════════════════════════════════════════════════");
+  console.log("🔍 INICIANDO DIAGNÓSTICO DE MODELOS");
+  console.log("═══════════════════════════════════════════════════════");
+
+  console.log(`Protocol: ${window.location.protocol}`);
+  console.log(`Href: ${window.location.href}`);
+  console.log(`Capacitor detected: ${window.Capacitor !== undefined}`);
+  console.log(`Origin: ${window.location.origin}`);
+
+  const testFiles = [
+    'models/tiny_face_detector_model-shard1.bin',
+    'models/face_expression_model-shard1.bin',
+    'models/face_landmark_68_tiny_model-shard1.bin'
+  ];
+
+  // Rutas a intentar
+  const pathPrefixes = [
+    'models',
+    './models',
+    'file://android_asset/public/models',
+    '/models',
+    'assets/models'
+  ];
+
+  console.log("═══════════════════════════════════════════════════════");
+  console.log("📂 PROBANDO RUTAS DE ACCESO");
+  console.log("═══════════════════════════════════════════════════════");
+
+  for (const prefix of pathPrefixes) {
+    console.log(`\n📍 Intentando con prefijo: "${prefix}"`);
+
+    for (const file of testFiles.slice(0, 1)) { // Probar solo el primero para no saturar logs
+      const fullPath = `${prefix}/${file.split('/')[1]}`;
+
+      try {
+        console.log(`  → Fetch: ${fullPath}`);
+        const response = await fetch(fullPath, { method: 'HEAD' });
+
+        if (response.ok) {
+          console.log(`  ✅ ACCESIBLE: ${fullPath} (${response.status})`);
+          return { success: true, workingPath: prefix, status: response.status };
+        }
+
+        console.log(`  ❌ No accesible: ${fullPath} (HTTP ${response.status})`);
+      } catch (e) {
+        console.log(`  ❌ Error: ${fullPath}`);
+        console.log(`     Motivo: ${e.message}`);
+      }
+    }
+  }
+
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("❌ NINGUNA RUTA FUNCIONÓ");
+  console.log("═══════════════════════════════════════════════════════");
+
+  return { success: false, workingPath: null };
+}
+
 // --- Initialization ---
 async function init() {
   console.log("Initializing VibeScan AI...");
 
+  // Forzar portrait en Android/Capacitor
+  if (window.Capacitor !== undefined) {
+    try {
+      const { ScreenOrientation } = await import('@capacitor/screen-orientation');
+      await ScreenOrientation.lock({ orientation: 'portrait' });
+      console.log("📱 Orientación forzada a portrait");
+    } catch (e) {
+      console.log("ScreenOrientation no disponible");
+    }
+  }
+
+  // ===== EJECUTAR DIAGNÓSTICO AUTOMÁTICO =====
+  const diagnostico = await testModelAccess();
+  console.log("📋 Resultado diagnóstico:", diagnostico);
+
+  // Detectar entorno
   const isCapacitor = window.Capacitor !== undefined;
   const isProduction = !window.location.href.includes('localhost');
+  const isFileProtocol = window.location.protocol === 'file:';
 
-  let modelPath = isCapacitor ? 'models' : './models/';
+  console.log(`\n🔧 ENTORNO DETECTADO:`);
+  console.log(`   Capacitor: ${isCapacitor}`);
+  console.log(`   Producción: ${isProduction}`);
+  console.log(`   Protocol file://: ${isFileProtocol}`);
 
+  // ===== DETERMINAR RUTA DE MODELOS =====
+  let modelPath = './models/';
+
+  if (isCapacitor || isFileProtocol) {
+    // En Android/Capacitor usar ruta relativa sin ./
+    modelPath = 'models/';
+    console.log(`📱 Usando ruta Capacitor: ${modelPath}`);
+  } else {
+    modelPath = './models/';
+    console.log(`🌐 Usando ruta web: ${modelPath}`);
+  }
+
+  // ===== CARGAR MODELOS =====
   try {
-    console.log(`Loading models from: ${modelPath}`);
-    console.log(`Capacitor: ${isCapacitor}, Production: ${isProduction}`);
+    console.log(`\n⏳ Cargando modelos desde: ${modelPath}`);
+
+    const startTime = performance.now();
 
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
@@ -53,35 +147,64 @@ async function init() {
       faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath)
     ]);
 
+    const endTime = performance.now();
     state.modelsLoaded = true;
-    console.log("✅ Models Loaded Successfully!");
-    console.log("Models path used:", modelPath);
+
+    console.log(`✅ MODELOS CARGADOS EXITOSAMENTE en ${(endTime - startTime).toFixed(2)}ms`);
+    console.log("   - TinyFaceDetector ✓");
+    console.log("   - FaceExpressionNet ✓");
+    console.log("   - FaceLandmark68TinyNet ✓");
 
   } catch (e) {
-    console.error("❌ Error loading models:", e);
-    console.error("Attempted path:", modelPath);
-    console.error("Check that models folder exists and .bin files are present");
+    console.error(`❌ ERROR CARGANDO MODELOS:`);
+    console.error(`   Path intentado: ${modelPath}`);
+    console.error(`   Error: ${e.message}`);
+    console.error(`   Stack: ${e.stack}`);
 
-    console.log("Trying fallback paths...");
-    const fallbacks = ['models/', './models/', '/models/'];
+    // ===== FALLBACK INTELIGENTE =====
+    console.log("\n🔄 Intentando rutas alternativas...");
+    const fallbackPaths = ['models/', './models/', '/models/', 'assets/models/'];
 
-    for (const fallback of fallbacks) {
+    let loadedFromFallback = false;
+
+    for (const fallback of fallbackPaths) {
+      if (fallback === modelPath) continue; // Saltar la que ya intentamos
+
       try {
-        console.log(`Trying: ${fallback}`);
+        console.log(`   → Probando: ${fallback}`);
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(fallback),
           faceapi.nets.faceExpressionNet.loadFromUri(fallback),
           faceapi.nets.faceLandmark68TinyNet.loadFromUri(fallback)
         ]);
+
+        modelPath = fallback;
         state.modelsLoaded = true;
-        console.log("✅ Loaded from fallback:", fallback);
-        return;
-      } catch (e2) {
-        continue;
+        loadedFromFallback = true;
+        console.log(`✅ MODELOS CARGADOS desde fallback: ${fallback}`);
+        break;
+
+      } catch (fallbackErr) {
+        console.log(`   ❌ Fallback ${fallback} falló: ${fallbackErr.message}`);
       }
     }
 
-    alert("Failed to load AI models.\n\nEnsure:\n1. public/models/ has all .json files\n2. All *-shard files are renamed to *.bin\n3. JSON manifests reference .bin files\n4. Run: npm run build");
+    if (!loadedFromFallback) {
+      // Si todas las rutas fallan
+      console.error("\n💥 FALLO CRÍTICO: No se pudieron cargar los modelos desde ninguna ruta");
+      alert(
+        "❌ FALLO DE MODELOS\n\n" +
+        "Diagnóstico:\n" +
+        `• Ruta intentada: ${modelPath}\n` +
+        `• Protocol: ${window.location.protocol}\n` +
+        `• Capacitor: ${isCapacitor}\n\n` +
+        "Soluciones:\n" +
+        "1. Verifica que public/models/ contiene los archivos\n" +
+        "2. Ejecuta: npm run build\n" +
+        "3. Revisa la consola para ver qué rutas fallaron"
+      );
+      return;
+    }
   }
 
   // Check Premium Status
@@ -106,7 +229,6 @@ async function init() {
   document.getElementById('start-btn').addEventListener('click', handleStartClick);
   document.getElementById('retry-btn').addEventListener('click', resetApp);
 
-  // Premium Button Listener
   const premiumBtn = document.querySelector('button[onclick*="payment.html"]');
   if (premiumBtn) {
     premiumBtn.onclick = null;
