@@ -38,25 +38,69 @@ const modeBtns = document.querySelectorAll('.mode-btn');
 async function init() {
   console.log("Initializing VibeScan AI...");
 
-  // Load Models
-  const modelPath = './models/';
+  const isCapacitor = window.Capacitor !== undefined;
+  const isProduction = !window.location.href.includes('localhost');
+  
+  let modelPath = 'models/';
+  
+  if (isCapacitor && isProduction) {
+    modelPath = 'models/';
+    console.log('📱 Running on Capacitor - using path:', modelPath);
+  } else if (window.location.protocol === 'file:') {
+    modelPath = 'models/';
+    console.log('📁 Running from file:// - using path:', modelPath);
+  } else {
+    modelPath = './models/';
+    console.log('🌐 Running on web - using path:', modelPath);
+  }
+  
   try {
-    console.log("Loading AI models from", modelPath);
+    console.log(`Loading models from: ${modelPath}`);
+    
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
       faceapi.nets.faceExpressionNet.loadFromUri(modelPath),
       faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath)
     ]);
+    
     state.modelsLoaded = true;
-    console.log("✅ Models Loaded Successfully");
+    console.log("✅ Models Loaded Successfully!");
+    console.log("TinyFaceDetector:", faceapi.nets.tinyFaceDetector.isLoaded);
+    console.log("FaceExpressionNet:", faceapi.nets.faceExpressionNet.isLoaded);
+    console.log("FaceLandmark68TinyNet:", faceapi.nets.faceLandmark68TinyNet.isLoaded);
+    
   } catch (e) {
     console.error("❌ Error loading models:", e);
-    console.error("Model path attempted:", modelPath);
-    console.error("Check that ./models/ directory exists in public folder");
+    console.error("Attempted path:", modelPath);
+    console.error("Protocol:", window.location.protocol);
+    console.error("Capacitor available:", isCapacitor);
+    
+    console.log("Attempting fallback paths...");
+    const fallbackPaths = ['models/', './models/', '/models/', 'assets/models/'];
+    
+    for (const fallbackPath of fallbackPaths) {
+      try {
+        console.log(`Trying fallback path: ${fallbackPath}`);
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(fallbackPath),
+          faceapi.nets.faceExpressionNet.loadFromUri(fallbackPath),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri(fallbackPath)
+        ]);
+        state.modelsLoaded = true;
+        console.log("✅ Models loaded from fallback path:", fallbackPath);
+        return;
+      } catch (e2) {
+        console.log(`Fallback path ${fallbackPath} failed, trying next...`);
+        continue;
+      }
+    }
+    
     alert(
-      "Failed to load AI models. Tried path: " +
-        modelPath +
-        "\n\nEnsure models folder exists in public/models/"
+      "Failed to load AI models.\n\n" +
+      "Please ensure:\n" +
+      "1. Models folder exists in public/models/\n" +
+      "2. All .json and model files are present\n" +
+      "3. Run 'npm run build' to generate dist folder"
     );
   }
 

@@ -6,7 +6,7 @@ export default defineConfig({
     plugins: [
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['models/*'],
+            includeAssets: ['models/**/*'],
             manifest: {
                 name: 'VibeScan AI',
                 short_name: 'VibeScan',
@@ -26,12 +26,21 @@ export default defineConfig({
                 ]
             },
             workbox: {
-                globPatterns: ['**/*.{js,css,html,ico,png,svg,json,shard1}'],
-                maximumFileSizeToCacheInBytes: 10 * 1024 * 1024 // Increase limit for models
+                globPatterns: ['**/*.{js,css,html,ico,png,svg,json,shard1,bin}'],
+                maximumFileSizeToCacheInBytes: 10 * 1024 * 1024
             }
         })
     ],
     server: {
         host: true
+    },
+    build: {
+        rollupOptions: {
+            output: {
+                assetFileNames: 'assets/[name]-[hash][extname]'
+            }
+        },
+        assetsDir: 'assets',
+        copyPublicDir: true
     }
 })
