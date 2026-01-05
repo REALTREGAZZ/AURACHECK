@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>VibeScan AI</title>
+  <meta name="description" content="Discover your true vibe. 100% Offline AI Scanner.">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Russo+One&display=swap"
+    rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-DYSNBtXf.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DS-RsfM6.css">
+<link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
+
+<body>
+  <div id="app">
+    <!-- 1. Landing Screen -->
+    <section id="landing-screen" class="screen active">
+      <div class="glitch-wrapper">
+        <h1 class="glitch" data-text="VIBESCAN">VIBESCAN</h1>
+        <span class="sub-glitch">AI DETECTOR</span>
+      </div>
+      <p class="hero-text">Are you the Main Character or just an NPC?</p>
+
+      <div class="mode-selector">
+        <button class="mode-btn active" data-mode="solo">🧍 SOLO</button>
+        <button class="mode-btn" data-mode="duo">🆚 BATTLE</button>
+        <button class="mode-btn" data-mode="squad">🔥 SQUAD</button>
+        <button class="mode-btn" data-mode="glowup">📈 GLOW UP</button>
+      </div>
+
+      <button id="start-btn" class="cyber-btn">
+        START SCAN <span class="arrow">→</span>
+      </button>
+      <button onclick="window.location.href='payment.html'" class="cyber-btn secondary" style="margin-top: 15px;">
+        💎 GET PREMIUM
+      </button>
+    </section>
+
+    <!-- 2. Scanner Screen -->
+    <section id="scanner-screen" class="screen">
+      <div class="camera-container">
+        <video id="video-feed" autoplay muted playsinline></video>
+        <canvas id="overlay-canvas"></canvas>
+        <div class="hud-overlay">
+          <div class="corner top-left"></div>
+          <div class="corner top-right"></div>
+          <div class="corner bottom-left"></div>
+          <div class="corner bottom-right"></div>
+          <div class="scan-line"></div>
+          <div class="hud-text" id="hud-text">INITIALIZING...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Result Screen -->
+    <section id="result-screen" class="screen">
+      <div class="result-container">
+        <div id="final-card" class="vibe-card">
+          <!-- Content injected via JS -->
+        </div>
+        <div class="actions">
+          <button id="share-btn" class="cyber-btn secondary">SHARE RESULT</button>
+          <button id="retry-btn" class="cyber-btn">SCAN AGAIN</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+
+</html>

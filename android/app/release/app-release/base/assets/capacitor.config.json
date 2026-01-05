@@ -1,0 +1,5 @@
+{
+	"appId": "com.auracheck.app",
+	"appName": "AuraCheck",
+	"webDir": "dist"
+}
