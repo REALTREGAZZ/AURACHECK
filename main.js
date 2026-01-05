@@ -1,7 +1,428 @@
 import * as faceapi from 'face-api.js';
 import './style.css';
 
-// --- State ---
+// === SOLICITUD DE PERMISO DE CÁMARA ===
+async function requestCameraPermission() {
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("📹 SOLICITANDO PERMISO DE CÁMARA");
+  console.log("═══════════════════════════════════════════════════════");
+
+  // Si no es Capacitor, permitir acceso directo
+  if (window.Capacitor === undefined) {
+    console.log("🌐 No es Capacitor, usando acceso directo a cámara");
+    return true;
+  }
+
+  try {
+    let Permissions = null;
+
+    try {
+      const permissionsPkg = '@capacitor/permissions';
+      const permissionsModule = await import(/* @vite-ignore */ permissionsPkg);
+      Permissions = permissionsModule.Permissions;
+    } catch {
+      Permissions = null;
+    }
+
+    if (Permissions?.query && Permissions?.requestPermissions) {
+      // Solicitar permiso de cámara
+      const cameraPermission = await Permissions.query({
+        name: 'Camera'
+      });
+
+      console.log(`📹 Estado actual del permiso de cámara: ${cameraPermission.state}`);
+
+      if (cameraPermission.state === 'prompt') {
+        console.log("⏳ Pidiendo permiso al usuario...");
+
+        const requestResult = await Permissions.requestPermissions({
+          permissions: ['Camera']
+        });
+
+        console.log("🔍 Resultado de solicitud:", requestResult);
+
+        const cameraState = requestResult.state;
+
+        if (cameraState === 'granted') {
+          console.log("✅ PERMISO DE CÁMARA CONCEDIDO");
+          return true;
+        } else {
+          console.warn("❌ PERMISO DE CÁMARA DENEGADO");
+          alert(
+            "⚠️ Permiso de Cámara Requerido\n\n" +
+              "AuraCheck necesita acceso a tu cámara para escanear tu vibe.\n\n" +
+              "Por favor, autoriza el acceso a la cámara en la configuración de Android."
+          );
+          return false;
+        }
+      } else if (cameraPermission.state === 'granted') {
+        console.log("✅ PERMISO DE CÁMARA YA CONCEDIDO");
+        return true;
+      } else {
+        console.warn("❌ PERMISO DE CÁMARA DENEGADO PERMANENTEMENTE");
+        alert(
+          "⚠️ Permiso de Cámara Denegado\n\n" +
+            "Necesitas autorizar el acceso a la cámara en:\n" +
+            "Configuración > Aplicaciones > AuraCheck > Permisos > Cámara"
+        );
+        return false;
+      }
+    }
+
+    let Camera = null;
+    try {
+      const cameraModule = await import('@capacitor/camera');
+      Camera = cameraModule.Camera;
+    } catch {
+      Camera = null;
+    }
+
+    if (Camera?.checkPermissions && Camera?.requestPermissions) {
+      const cameraPermission = await Camera.checkPermissions();
+      const state = cameraPermission.camera;
+
+      console.log(`📹 Estado actual del permiso de cámara: ${state}`);
+
+      if (state === 'prompt') {
+        console.log("⏳ Pidiendo permiso al usuario...");
+        const requestResult = await Camera.requestPermissions({ permissions: ['camera'] });
+        console.log("🔍 Resultado de solicitud:", requestResult);
+
+        if (requestResult.camera === 'granted') {
+          console.log("✅ PERMISO DE CÁMARA CONCEDIDO");
+          return true;
+        }
+
+        console.warn("❌ PERMISO DE CÁMARA DENEGADO");
+        alert(
+          "⚠️ Permiso de Cámara Requerido\n\n" +
+            "AuraCheck necesita acceso a tu cámara para escanear tu vibe.\n\n" +
+            "Por favor, autoriza el acceso a la cámara en la configuración de Android."
+        );
+        return false;
+      }
+
+      if (state === 'granted') {
+        console.log("✅ PERMISO DE CÁMARA YA CONCEDIDO");
+        return true;
+      }
+
+      console.warn("❌ PERMISO DE CÁMARA DENEGADO PERMANENTEMENTE");
+      alert(
+        "⚠️ Permiso de Cámara Denegado\n\n" +
+          "Necesitas autorizar el acceso a la cámara en:\n" +
+          "Configuración > Aplicaciones > AuraCheck > Permisos > Cámara"
+      );
+      return false;
+    }
+
+    console.warn("⚠️ Plugin de permisos no disponible, intentando solicitar permiso con getUserMedia...");
+
+    try {
+      const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      tmpStream.getTracks().forEach(t => t.stop());
+      console.log("✅ PERMISO DE CÁMARA CONCEDIDO");
+      return true;
+    } catch (err) {
+      console.warn("❌ PERMISO DE CÁMARA DENEGADO (getUserMedia)");
+      alert(
+        "⚠️ Permiso de Cámara Requerido\n\n" +
+          "AuraCheck necesita acceso a tu cámara para escanear tu vibe.\n\n" +
+          "Por favor, autoriza el acceso a la cámara en la configuración de Android."
+      );
+      return false;
+    }
+  } catch (e) {
+    console.error("❌ Error solicitando permiso de cámara:", e);
+    console.warn("Continuando sin validación de permisos (puede fallar en Android)");
+    return true; // Intentar continuar de todas formas
+  }
+}
+
+// === SISTEMA PREMIUM CON GOOGLE PLAY ===
+class PremiumManager {
+  constructor() {
+    this.isPremium = localStorage.getItem('vibescan_premium') === 'true';
+    this.productId = 'premium_lifetime'; // ID en Google Play Console
+    this.price = '$9.99 USD';
+    this.InAppPurchase = null;
+  }
+
+  async init() {
+    console.log("\n═══════════════════════════════════════════════════════");
+    console.log("💎 INICIALIZANDO SISTEMA PREMIUM");
+    console.log("═══════════════════════════════════════════════════════");
+
+    if (window.Capacitor === undefined) {
+      console.log("🌐 No es Capacitor, Premium simulado en web");
+      return;
+    }
+
+    try {
+      const iapModule = await import('@capacitor-community/in-app-purchase');
+      this.InAppPurchase = iapModule.InAppPurchase;
+
+      if (!this.InAppPurchase) {
+        throw new Error('InAppPurchase export no encontrado');
+      }
+
+      // Inicializar Google Play Billing
+      try {
+        await this.InAppPurchase.initialize({
+          ios: true,
+          android: true
+        });
+      } catch {
+        await this.InAppPurchase.initialize();
+      }
+
+      console.log("✅ Google Play Billing inicializado");
+
+      // Escuchar cambios en compras
+      if (typeof this.InAppPurchase.onPurchasesUpdated === 'function') {
+        this.InAppPurchase.onPurchasesUpdated(async (result) => {
+          console.log("🔔 Compras actualizadas:", result);
+          await this.handlePurchaseUpdate(result);
+        });
+      } else if (typeof this.InAppPurchase.addListener === 'function') {
+        this.InAppPurchase.addListener('purchasesUpdated', async (result) => {
+          console.log("🔔 Compras actualizadas:", result);
+          await this.handlePurchaseUpdate(result);
+        });
+      }
+
+      await this.restorePurchases();
+    } catch (e) {
+      console.warn("⚠️ Google Play Billing no disponible:", e.message);
+      console.log("Usando sistema Premium simulado");
+      this.InAppPurchase = null;
+    }
+  }
+
+  async restorePurchases() {
+    if (!this.InAppPurchase) return;
+
+    try {
+      if (typeof this.InAppPurchase.getPurchases === 'function') {
+        const purchases = await this.InAppPurchase.getPurchases();
+        await this.handlePurchaseUpdate(purchases);
+      } else if (typeof this.InAppPurchase.restorePurchases === 'function') {
+        const purchases = await this.InAppPurchase.restorePurchases();
+        await this.handlePurchaseUpdate(purchases);
+      }
+    } catch (e) {
+      console.log("ℹ️ No se pudieron restaurar compras:", e.message);
+    }
+  }
+
+  async handlePurchaseUpdate(purchasesOrResult) {
+    const purchases = Array.isArray(purchasesOrResult)
+      ? purchasesOrResult
+      : (purchasesOrResult?.purchases || purchasesOrResult?.results || []);
+
+    console.log("📋 Procesando compras:", purchases);
+
+    for (const purchase of purchases) {
+      if (purchase.productId !== this.productId) continue;
+
+      const state = purchase.state || purchase.purchaseState || purchase.purchase_state;
+      const isPurchased = state === 'Purchased' || state === 'PURCHASED' || state === 1 || state === '1';
+
+      if (isPurchased) {
+        console.log("✅ COMPRA EXITOSA DETECTADA");
+        await this.activatePremium({ showAlert: false });
+
+        try {
+          if (typeof this.InAppPurchase.finishTransaction === 'function') {
+            await this.InAppPurchase.finishTransaction({ purchase });
+          } else if (typeof this.InAppPurchase.acknowledgePurchase === 'function') {
+            await this.InAppPurchase.acknowledgePurchase({ purchase });
+          }
+        } catch {
+          // No bloquear activación Premium por falta de acknowledge
+        }
+      }
+    }
+  }
+
+  async requestPremium() {
+    console.log("\n═══════════════════════════════════════════════════════");
+    console.log("💳 INICIANDO COMPRA PREMIUM");
+    console.log("═══════════════════════════════════════════════════════");
+
+    if (this.isPremium) {
+      console.log("✅ Usuario ya es Premium");
+      alert("✨ Ya tienes acceso Premium\n\n¡Disfruta todas las funciones desbloqueadas!");
+      return;
+    }
+
+    if (!this.InAppPurchase) {
+      console.log("ℹ️ Simulando compra en navegador/web");
+      const simulatePayment = confirm(
+        "💎 PREMIUM - $9.99 USD\n\n" +
+          "Desbloquea:\n" +
+          "• Escaneos ilimitados\n" +
+          "• Todos los badges\n" +
+          "• Modo Glow Up (Beauty Score)\n" +
+          "• Historial completo\n\n" +
+          "¿Confirmar compra?"
+      );
+
+      if (simulatePayment) {
+        await this.activatePremium({ showAlert: true });
+      }
+      return;
+    }
+
+    try {
+      console.log(`💳 Solicitando producto: ${this.productId}`);
+
+      // Obtener detalles del producto
+      let productsResponse = null;
+      try {
+        productsResponse = await this.InAppPurchase.getProducts({
+          ios: [],
+          android: [this.productId]
+        });
+      } catch {
+        try {
+          productsResponse = await this.InAppPurchase.getProducts({ products: [this.productId] });
+        } catch {
+          productsResponse = await this.InAppPurchase.getProducts([this.productId]);
+        }
+      }
+
+      const products = Array.isArray(productsResponse)
+        ? productsResponse
+        : (productsResponse?.products || productsResponse?.android || []);
+
+      console.log("📦 Productos disponibles:", productsResponse);
+
+      if (!products || products.length === 0) {
+        console.error("❌ Producto no encontrado en Google Play Console");
+        alert(
+          "❌ Error en Compra\n\n" +
+            "El producto Premium no está configurado en Google Play Console.\n\n" +
+            "ID esperado: " + this.productId
+        );
+        return;
+      }
+
+      const product = products[0];
+      console.log(`💰 Precio: ${product.localizedPrice || product.price || this.price}`);
+
+      // Mostrar confirmación con precio real
+      const confirmed = confirm(
+        `💎 PREMIUM UNLOCK\n\n` +
+          `Precio: ${product.localizedPrice || this.price}\n\n` +
+          `Desbloquea:\n` +
+          `• Escaneos ilimitados\n` +
+          `• Todos los badges\n` +
+          `• Modo Glow Up (Beauty Score)\n` +
+          `• Historial completo\n\n` +
+          `¿Proceder al pago?`
+      );
+
+      if (!confirmed) {
+        console.log("❌ Usuario canceló compra");
+        return;
+      }
+
+      // Procesar compra
+      console.log("⏳ Procesando compra...");
+
+      if (typeof this.InAppPurchase.purchaseProduct === 'function') {
+        await this.InAppPurchase.purchaseProduct({
+          productId: this.productId
+        });
+      } else if (typeof this.InAppPurchase.purchase === 'function') {
+        await this.InAppPurchase.purchase({
+          productId: this.productId
+        });
+      } else {
+        await this.InAppPurchase.purchase({
+          products: [{ productId: this.productId }]
+        });
+      }
+
+      console.log("⏳ Esperando confirmación de Google Play...");
+    } catch (e) {
+      console.error("❌ Error en proceso de compra:", e);
+      alert(
+        "❌ Error en la Compra\n\n" +
+          e.message + "\n\n" +
+          "Por favor, intenta de nuevo más tarde."
+      );
+    }
+  }
+
+  applyPremiumUI() {
+    document.body.classList.add('is-premium');
+
+    const premiumBtn = document.querySelector('button[onclick*="payment.html"]');
+    if (premiumBtn) premiumBtn.style.display = 'none';
+
+    const landingScreen = document.getElementById('landing-screen');
+    if (!landingScreen) return;
+
+    if (document.getElementById('premium-badge')) return;
+
+    const premiumBadge = document.createElement('div');
+    premiumBadge.id = 'premium-badge';
+    premiumBadge.innerHTML = '⭐ PREMIUM UNLOCKED';
+    premiumBadge.style.cssText = `
+        color: #FFD700;
+        font-weight: bold;
+        padding: 10px 20px;
+        margin: 20px auto;
+        text-shadow: 0 0 10px #FFD700;
+        font-size: 1.1rem;
+        border: 2px solid #FFD700;
+        border-radius: 8px;
+        text-align: center;
+      `;
+
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) landingScreen.insertBefore(premiumBadge, startBtn);
+    else landingScreen.appendChild(premiumBadge);
+  }
+
+  async activatePremium({ showAlert } = { showAlert: true }) {
+    console.log("\n═══════════════════════════════════════════════════════");
+    console.log("✅ ACTIVANDO PREMIUM");
+    console.log("═══════════════════════════════════════════════════════");
+
+    try {
+      this.isPremium = true;
+      localStorage.setItem('vibescan_premium', 'true');
+      localStorage.setItem('vibescan_premium_date', new Date().toISOString());
+
+      this.applyPremiumUI();
+
+      console.log("✅ Premium activado exitosamente");
+
+      if (showAlert) {
+        alert(
+          "🎉 ¡Bienvenido a Premium!\n\nAhora disfrutas de:\n" +
+            "• Escaneos ilimitados\n" +
+            "• Todos los badges\n" +
+            "• Modo Glow Up\n" +
+            "• Historial completo"
+        );
+      }
+    } catch (e) {
+      console.error("❌ Error activando Premium:", e);
+    }
+  }
+
+  isPremiumUser() {
+    return this.isPremium;
+  }
+}
+
+// Instancia global de Premium
+const premiumManager = new PremiumManager();
+
 // --- State ---
 const state = {
   scanning: false,
@@ -98,22 +519,25 @@ async function testModelAccess() {
 async function init() {
   console.log("Initializing VibeScan AI...");
 
-  // Forzar portrait en Android/Capacitor
-  if (window.Capacitor !== undefined) {
-    try {
-      const { ScreenOrientation } = await import('@capacitor/screen-orientation');
-      await ScreenOrientation.lock({ orientation: 'portrait' });
-      console.log("📱 Orientación forzada a portrait");
-    } catch (e) {
-      console.log("ScreenOrientation no disponible");
-    }
-  }
-
-  // ===== EJECUTAR DIAGNÓSTICO AUTOMÁTICO =====
+  // 1. EJECUTAR DIAGNÓSTICO DE MODELOS
   const diagnostico = await testModelAccess();
   console.log("📋 Resultado diagnóstico:", diagnostico);
 
-  // Detectar entorno
+  // 2. INICIALIZAR SISTEMA PREMIUM
+  await premiumManager.init();
+
+  // 3. SOLICITAR PERMISO DE CÁMARA (NO ABRIR CÁMARA AÚN)
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("🔐 PREPARANDO PERMISOS");
+  console.log("═══════════════════════════════════════════════════════");
+  const hasCameraPermission = await requestCameraPermission();
+
+  if (!hasCameraPermission) {
+    console.warn("⚠️ Usuario debe autorizar cámara antes de escanear");
+    // No bloquear la app, solo mostrar advertencia cuando intente escanear
+  }
+
+  // 4. CARGAR MODELOS DE IA
   const isCapacitor = window.Capacitor !== undefined;
   const isProduction = !window.location.href.includes('localhost');
   const isFileProtocol = window.location.protocol === 'file:';
@@ -123,11 +547,9 @@ async function init() {
   console.log(`   Producción: ${isProduction}`);
   console.log(`   Protocol file://: ${isFileProtocol}`);
 
-  // ===== DETERMINAR RUTA DE MODELOS =====
   let modelPath = './models/';
 
   if (isCapacitor || isFileProtocol) {
-    // En Android/Capacitor usar ruta relativa sin ./
     modelPath = 'models/';
     console.log(`📱 Usando ruta Capacitor: ${modelPath}`);
   } else {
@@ -135,7 +557,6 @@ async function init() {
     console.log(`🌐 Usando ruta web: ${modelPath}`);
   }
 
-  // ===== CARGAR MODELOS =====
   try {
     console.log(`\n⏳ Cargando modelos desde: ${modelPath}`);
 
@@ -154,87 +575,85 @@ async function init() {
     console.log("   - TinyFaceDetector ✓");
     console.log("   - FaceExpressionNet ✓");
     console.log("   - FaceLandmark68TinyNet ✓");
-
   } catch (e) {
-    console.error(`❌ ERROR CARGANDO MODELOS:`);
-    console.error(`   Path intentado: ${modelPath}`);
-    console.error(`   Error: ${e.message}`);
-    console.error(`   Stack: ${e.stack}`);
-
-    // ===== FALLBACK INTELIGENTE =====
-    console.log("\n🔄 Intentando rutas alternativas...");
+    console.error(`❌ ERROR CARGANDO MODELOS:`, e);
     const fallbackPaths = ['models/', './models/', '/models/', 'assets/models/'];
 
     let loadedFromFallback = false;
 
     for (const fallback of fallbackPaths) {
-      if (fallback === modelPath) continue; // Saltar la que ya intentamos
+      if (fallback === modelPath) continue;
 
       try {
-        console.log(`   → Probando: ${fallback}`);
+        console.log(`   → Probando fallback: ${fallback}`);
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(fallback),
           faceapi.nets.faceExpressionNet.loadFromUri(fallback),
           faceapi.nets.faceLandmark68TinyNet.loadFromUri(fallback)
         ]);
-
-        modelPath = fallback;
         state.modelsLoaded = true;
         loadedFromFallback = true;
         console.log(`✅ MODELOS CARGADOS desde fallback: ${fallback}`);
         break;
-
-      } catch (fallbackErr) {
-        console.log(`   ❌ Fallback ${fallback} falló: ${fallbackErr.message}`);
+      } catch {
+        console.log(`   ❌ Fallback ${fallback} falló`);
       }
     }
 
     if (!loadedFromFallback) {
-      // Si todas las rutas fallan
       console.error("\n💥 FALLO CRÍTICO: No se pudieron cargar los modelos desde ninguna ruta");
       alert(
         "❌ FALLO DE MODELOS\n\n" +
-        "Diagnóstico:\n" +
-        `• Ruta intentada: ${modelPath}\n` +
-        `• Protocol: ${window.location.protocol}\n` +
-        `• Capacitor: ${isCapacitor}\n\n` +
-        "Soluciones:\n" +
-        "1. Verifica que public/models/ contiene los archivos\n" +
-        "2. Ejecuta: npm run build\n" +
-        "3. Revisa la consola para ver qué rutas fallaron"
+          "Diagnóstico:\n" +
+          `• Ruta intentada: ${modelPath}\n` +
+          `• Protocol: ${window.location.protocol}\n` +
+          `• Capacitor: ${isCapacitor}\n\n` +
+          "Soluciones:\n" +
+          "1. Verifica que public/models/ contiene los archivos\n" +
+          "2. Ejecuta: npm run build\n" +
+          "3. Revisa la consola para ver qué rutas fallaron"
       );
       return;
     }
   }
 
-  // Check Premium Status
-  const isPremium = localStorage.getItem('vibescan_premium') === 'true';
-  if (isPremium) {
-    document.body.classList.add('is-premium');
-    const supportBtn = document.querySelector('button[onclick*="payment.html"]');
-    if (supportBtn) supportBtn.style.display = 'none';
+  // 5. SETUP PREMIUM - Verificar estado al iniciar
+  if (premiumManager.isPremiumUser()) {
+    console.log("⭐ Usuario Premium detectado");
+    premiumManager.applyPremiumUI();
+  }
 
-    const premiumBadge = document.createElement('div');
-    premiumBadge.innerHTML = '⭐ PREMIUM UNLOCKED';
-    premiumBadge.style.cssText = 'color: #FFD700; font-weight: bold; margin-top: 20px; text-shadow: 0 0 10px #FFD700; font-size: 1.2rem;';
-
-    const landingScreen = document.getElementById('landing-screen');
-    const startBtn = document.getElementById('start-btn');
-    if (landingScreen && startBtn) {
-      landingScreen.insertBefore(premiumBadge, startBtn);
+  // 6. FORZAR ORIENTACIÓN VERTICAL (Capacitor)
+  if (window.Capacitor !== undefined) {
+    try {
+      const { ScreenOrientation } = await import('@capacitor/screen-orientation');
+      await ScreenOrientation.lock({ orientation: 'portrait' });
+      console.log("📱 Orientación forzada a portrait");
+    } catch (e) {
+      console.log("ℹ️ ScreenOrientation no disponible");
     }
   }
 
-  // Event Listeners
-  document.getElementById('start-btn').addEventListener('click', handleStartClick);
+  // 7. EVENT LISTENERS
+  document.getElementById('start-btn').addEventListener('click', async () => {
+    // Verificar permiso de cámara antes de usar
+    const hasPermission = await requestCameraPermission();
+    if (hasPermission) {
+      await handleStartClick();
+    } else {
+      console.error("❌ Permiso de cámara denegado, no se puede escanear");
+      alert("Se requiere permiso de cámara para escanear.");
+    }
+  });
+
   document.getElementById('retry-btn').addEventListener('click', resetApp);
 
   const premiumBtn = document.querySelector('button[onclick*="payment.html"]');
   if (premiumBtn) {
     premiumBtn.onclick = null;
-    premiumBtn.addEventListener('click', (e) => {
+    premiumBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      window.location.href = '/payment.html';
+      await premiumManager.requestPremium();
     });
   }
 
@@ -244,11 +663,11 @@ async function init() {
   modeBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
       const newMode = e.target.dataset.mode;
-      const isPremium = localStorage.getItem('vibescan_premium') === 'true';
+      const isPremium = premiumManager.isPremiumUser();
 
       if (newMode === 'glowup' && !isPremium) {
-        if (confirm("💎 Premium Feature Locked\n\nUnlock Glow Up mode to see your Beauty Score & Looksmaxxing tips?")) {
-          window.location.href = '/payment.html';
+        if (confirm("💎 Modo Glow Up - Premium\n\nUnlock para ver tu Beauty Score y consejos de Looksmaxxing?\n\n$9.99 USD")) {
+          premiumManager.requestPremium();
         }
         return;
       }
@@ -258,11 +677,14 @@ async function init() {
       state.mode = newMode;
     });
   });
+
+  console.log("\n✅ INICIALIZACIÓN COMPLETADA");
+  console.log("═══════════════════════════════════════════════════════\n");
 }
 
 // --- Daily Limit Logic ---
 function canScanToday() {
-  const isPremium = localStorage.getItem('vibescan_premium') === 'true';
+  const isPremium = premiumManager.isPremiumUser();
   if (isPremium) return true;
 
   const now = new Date();
@@ -281,13 +703,21 @@ function canScanToday() {
   return dailyCount < 3;
 }
 
-function handleStartClick() {
+async function handleStartClick() {
   if (!canScanToday()) {
-    alert("🚨 Daily Limit Reached!\n\nYou've used your 3 free scans today. Upgrade to Premium for unlimited scans and exclusive features!");
-    window.location.href = '/payment.html';
+    const shouldUpgrade = confirm(
+      "🚨 Daily Limit Reached!\n\n" +
+        "You've used your 3 free scans today.\n\n" +
+        "Upgrade to Premium for unlimited scans and exclusive features?"
+    );
+
+    if (shouldUpgrade) {
+      await premiumManager.requestPremium();
+    }
     return;
   }
-  startScanner();
+
+  await startScanner();
 }
 
 // --- Navigation ---
@@ -300,6 +730,14 @@ function showScreen(name) {
 async function startScanner() {
   if (!state.modelsLoaded) {
     alert("AI Models loading... please wait.");
+    return;
+  }
+
+  const hasPermission = await requestCameraPermission();
+  if (!hasPermission) {
+    console.error("❌ Permiso de cámara denegado, no se puede iniciar el scanner");
+    alert("Se requiere permiso de cámara para escanear.");
+    showScreen('landing');
     return;
   }
 
@@ -437,7 +875,7 @@ function finishAnalysis(lastDetections) {
 }
 
 function checkBadges(result) {
-  const isPremium = localStorage.getItem('vibescan_premium') === 'true';
+  const isPremium = premiumManager.isPremiumUser();
   const currentBadges = JSON.parse(localStorage.getItem('vibescan_badges') || '[]');
   const newBadges = [];
 

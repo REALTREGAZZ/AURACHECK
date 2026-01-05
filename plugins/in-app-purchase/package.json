@@ -1,0 +1,22 @@
+{
+  "name": "@capacitor-community/in-app-purchase",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Local Capacitor plugin with minimal Google Play Billing support.",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "files": [
+    "android/src/main/",
+    "android/build.gradle",
+    "dist/"
+  ],
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  }
+}
