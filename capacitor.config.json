@@ -11,9 +11,6 @@
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
-    },
-    "ScreenOrientation": {
-      "orientations": ["portrait"]
     }
   }
 }
