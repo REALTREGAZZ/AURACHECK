@@ -40,68 +40,48 @@ async function init() {
 
   const isCapacitor = window.Capacitor !== undefined;
   const isProduction = !window.location.href.includes('localhost');
-  
-  let modelPath = 'models/';
-  
-  if (isCapacitor && isProduction) {
-    modelPath = 'models/';
-    console.log('📱 Running on Capacitor - using path:', modelPath);
-  } else if (window.location.protocol === 'file:') {
-    modelPath = 'models/';
-    console.log('📁 Running from file:// - using path:', modelPath);
-  } else {
-    modelPath = './models/';
-    console.log('🌐 Running on web - using path:', modelPath);
-  }
-  
+
+  let modelPath = isCapacitor ? 'models' : './models/';
+
   try {
     console.log(`Loading models from: ${modelPath}`);
-    
+    console.log(`Capacitor: ${isCapacitor}, Production: ${isProduction}`);
+
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
       faceapi.nets.faceExpressionNet.loadFromUri(modelPath),
       faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath)
     ]);
-    
+
     state.modelsLoaded = true;
     console.log("✅ Models Loaded Successfully!");
-    console.log("TinyFaceDetector:", faceapi.nets.tinyFaceDetector.isLoaded);
-    console.log("FaceExpressionNet:", faceapi.nets.faceExpressionNet.isLoaded);
-    console.log("FaceLandmark68TinyNet:", faceapi.nets.faceLandmark68TinyNet.isLoaded);
-    
+    console.log("Models path used:", modelPath);
+
   } catch (e) {
     console.error("❌ Error loading models:", e);
     console.error("Attempted path:", modelPath);
-    console.error("Protocol:", window.location.protocol);
-    console.error("Capacitor available:", isCapacitor);
-    
-    console.log("Attempting fallback paths...");
-    const fallbackPaths = ['models/', './models/', '/models/', 'assets/models/'];
-    
-    for (const fallbackPath of fallbackPaths) {
+    console.error("Check that models folder exists and .bin files are present");
+
+    console.log("Trying fallback paths...");
+    const fallbacks = ['models/', './models/', '/models/'];
+
+    for (const fallback of fallbacks) {
       try {
-        console.log(`Trying fallback path: ${fallbackPath}`);
+        console.log(`Trying: ${fallback}`);
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(fallbackPath),
-          faceapi.nets.faceExpressionNet.loadFromUri(fallbackPath),
-          faceapi.nets.faceLandmark68TinyNet.loadFromUri(fallbackPath)
+          faceapi.nets.tinyFaceDetector.loadFromUri(fallback),
+          faceapi.nets.faceExpressionNet.loadFromUri(fallback),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri(fallback)
         ]);
         state.modelsLoaded = true;
-        console.log("✅ Models loaded from fallback path:", fallbackPath);
+        console.log("✅ Loaded from fallback:", fallback);
         return;
       } catch (e2) {
-        console.log(`Fallback path ${fallbackPath} failed, trying next...`);
         continue;
       }
     }
-    
-    alert(
-      "Failed to load AI models.\n\n" +
-      "Please ensure:\n" +
-      "1. Models folder exists in public/models/\n" +
-      "2. All .json and model files are present\n" +
-      "3. Run 'npm run build' to generate dist folder"
-    );
+
+    alert("Failed to load AI models.\n\nEnsure:\n1. public/models/ has all .json files\n2. All *-shard files are renamed to *.bin\n3. JSON manifests reference .bin files\n4. Run: npm run build");
   }
 
   // Check Premium Status
