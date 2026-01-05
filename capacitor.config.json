@@ -5,6 +5,7 @@
   "orientation": "portrait",
   "server": {
     "cleartext": true,
+    "allowMixedContent": true,
     "allowNavigation": ["*"]
   },
   "plugins": {

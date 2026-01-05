@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">VibeScan</string>
-    <string name="title_activity_main">VibeScan</string>
-    <string name="package_name">com.vibescan.ai.scanner</string>
-    <string name="custom_url_scheme">com.vibescan.ai.scanner</string>
+    <string name="app_name">AuraCheck</string>
+    <string name="title_activity_main">AuraCheck</string>
+    <string name="package_name">com.auracheck.app</string>
+    <string name="custom_url_scheme">com.auracheck.app</string>
 </resources>
