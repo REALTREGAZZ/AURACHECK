@@ -40,3 +40,4 @@ node_modules/
 # Local plugin dist stubs (no confundir con build output de la app)
 !plugins/in-app-purchase/dist/
 !plugins/in-app-purchase/dist/**
+android/app/release/
